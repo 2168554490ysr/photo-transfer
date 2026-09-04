@@ -1,0 +1,6 @@
+{
+  "phone_paths": ["__mediastore__"],
+  "pc_photo_dir": "D:/个人/相片",
+  "pc_video_dir": "D:/个人/视频",
+  "verify_conflicts": false
+}
