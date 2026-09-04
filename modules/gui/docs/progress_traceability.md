@@ -9,6 +9,7 @@
 | 2026-07-12 | 创建 lib/reporter.py + orchestrator.py | REQ-03 | `lib/` | — | 完成 |
 | 2026-07-12 | 界面美化（现代配色/卡片布局）+ 进度条改字节驱动 + 百分比 | REQ-01、REQ-02 | `gui/gui.py`、`lib/reporter.py` | 手动验证 | 完成 |
 | 2026-07-12 | 照片/视频目录可配置（输入框 + 浏览 + 保存） | REQ-05 | `gui/gui.py` | 手动验证 | 完成 |
+| 2026-07-12 | 窗口关闭即取消并终止后台 adb（干净退出） | REQ-04 | `gui/gui.py`、`orchestrator.py` | 手动验证 + TestCancel | 完成 |
 
 ## 追溯矩阵
 

@@ -42,12 +42,23 @@ class SyncWorker:
         if self._thread and self._thread.is_alive():
             return
         self._cancel_flag.clear()
+        # 清除上次取消标志，使新一轮同步可正常执行 adb
+        try:
+            m1 = load_module("adb_connector", "device")
+            m1.reset_cancel()
+        except Exception:
+            pass
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
     def cancel(self) -> None:
-        """请求取消同步。"""
+        """请求取消同步，并终止正在运行的 adb 子进程（关闭窗口时干净退出）。"""
         self._cancel_flag.set()
+        try:
+            m1 = load_module("adb_connector", "device")
+            m1.kill_all_adb()
+        except Exception:
+            pass
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()

@@ -208,6 +208,8 @@ class PhotoSyncApp:
         self._worker: SyncWorker | None = None
         self._build_ui()
         self._load_config()
+        # 窗口关闭时取消同步并终止后台 adb 子进程，干净退出
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _build_ui(self) -> None:
         root = self.root
@@ -388,6 +390,12 @@ class PhotoSyncApp:
             self._worker.cancel()
             self._append_log("正在取消...")
             self.btn_cancel.configure(state=tk.DISABLED)
+
+    def _on_close(self) -> None:
+        """窗口关闭：取消同步并终止后台 adb 子进程，随后退出。"""
+        if self._worker:
+            self._worker.cancel()
+        self.root.destroy()
 
     def _explore_device(self) -> None:
         """探索设备信息。"""
