@@ -8,6 +8,7 @@
 | 2026-07-12 | 实现 gui.py (tkinter) | REQ-01~04 | `gui/gui.py` | `gui/tests/` | 完成 |
 | 2026-07-12 | 创建 lib/reporter.py + orchestrator.py | REQ-03 | `lib/` | — | 完成 |
 | 2026-07-12 | 界面美化（现代配色/卡片布局）+ 进度条改字节驱动 + 百分比 | REQ-01、REQ-02 | `gui/gui.py`、`lib/reporter.py` | 手动验证 | 完成 |
+| 2026-07-12 | 照片/视频目录可配置（输入框 + 浏览 + 保存） | REQ-05 | `gui/gui.py` | 手动验证 | 完成 |
 
 ## 追溯矩阵
 
@@ -17,3 +18,4 @@
 | REQ-02 | 实时进度（字节驱动 + 大文件实时刷新 + 百分比） | `gui.py:GuiReporter._update_download_widgets()` | 手动验证 | 完成 |
 | REQ-03 | 后端解耦 | `lib/reporter.py` + `lib/orchestrator.py` | 代码审查 | 完成 |
 | REQ-04 | 线程安全 | `SyncWorker` (Thread) + `root.after()` | 手动验证 | 完成 |
+| REQ-05 | 目录配置 | `gui.py:_browse_dir()` / `_save_config()` | 手动验证 | 完成 |

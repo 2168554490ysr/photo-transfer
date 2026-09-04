@@ -43,3 +43,15 @@
 - 大文件下载耗时长，若只在文件完成后更新，进度条会长时间停滞造成"卡死"假象；轮询文件大小实现边下边走
 - GUI 通过 `ProgressReporter.on_download_progress` 接收 `downloaded_bytes`，与后端解耦（沿用 ARC-01）
 - 界面统一配色/卡片布局仅使用 ttk 样式，不引入第三方库（沿用 ARC-04）
+
+---
+
+## ARC-06: 目录配置（Entry + filedialog + 持久化）
+
+**决策**: 目标目录在 GUI 内通过 `ttk.Entry` 编辑、`tkinter.filedialog.askdirectory` 选择；"保存目录"写回 `config.json`（仅更新目录字段，保留 `phone_paths`/`verify_conflicts` 等）。
+
+**理由**:
+- 满足用户在界面直接调整目标目录的需求，无需手动改 `config.json`
+- 仅使用 tkinter 标准库（`filedialog`），符合 ARC-04 零额外依赖
+- 写回时只改目录字段，避免覆盖其他配置
+- GUI 仍不导入业务模块，目录仅作为参数传给 `SyncWorker`（沿用 ARC-01 解耦）

@@ -8,7 +8,7 @@ import sys
 import os
 import json
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 
 # 确保项目根目录在 sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -84,6 +84,11 @@ def _configure_style(root: tk.Tk) -> None:
                     troughcolor=COLORS["border"], background=COLORS["accent"],
                     bordercolor=COLORS["border"], lightcolor=COLORS["accent"],
                     darkcolor=COLORS["accent"])
+
+    # 目录输入框
+    style.configure("Dir.TEntry", fieldbackground="#ffffff", bordercolor=COLORS["border"],
+                    foreground=COLORS["text"], padding=(8, 5))
+    style.map("Dir.TEntry", bordercolor=[("focus", COLORS["accent"])])
 
     # 标签框
     style.configure("Card.TLabelframe", background=COLORS["card"], bordercolor=COLORS["border"])
@@ -220,7 +225,7 @@ class PhotoSyncApp:
         content = ttk.Frame(root, style="App.TFrame")
         content.pack(fill=tk.BOTH, expand=True, padx=16, pady=14)
 
-        # 目标目录卡片
+        # 目标目录卡片（可编辑 + 浏览选择 + 保存）
         cfg_card = ttk.LabelFrame(content, text="目标目录", style="Card.TLabelframe", padding=14)
         cfg_card.pack(fill=tk.X)
         grid = ttk.Frame(cfg_card, style="Card.TFrame")
@@ -228,12 +233,23 @@ class PhotoSyncApp:
         grid.columnconfigure(1, weight=1)
 
         ttk.Label(grid, text="照片目录", style="Muted.TLabel").grid(row=0, column=0, sticky=tk.W, pady=4)
-        self.lbl_photo = ttk.Label(grid, text="—", style="Body.TLabel")
-        self.lbl_photo.grid(row=0, column=1, sticky=tk.W, padx=12, pady=4)
+        self.photo_var = tk.StringVar()
+        photo_entry = ttk.Entry(grid, textvariable=self.photo_var, style="Dir.TEntry")
+        photo_entry.grid(row=0, column=1, sticky=tk.EW, padx=(10, 4), pady=4)
+        ttk.Button(grid, text="浏览…", style="Ghost.TButton",
+                   command=lambda: self._browse_dir(self.photo_var)).grid(
+            row=0, column=2, sticky=tk.W)
 
         ttk.Label(grid, text="视频目录", style="Muted.TLabel").grid(row=1, column=0, sticky=tk.W, pady=4)
-        self.lbl_video = ttk.Label(grid, text="—", style="Body.TLabel")
-        self.lbl_video.grid(row=1, column=1, sticky=tk.W, padx=12, pady=4)
+        self.video_var = tk.StringVar()
+        video_entry = ttk.Entry(grid, textvariable=self.video_var, style="Dir.TEntry")
+        video_entry.grid(row=1, column=1, sticky=tk.EW, padx=(10, 4), pady=4)
+        ttk.Button(grid, text="浏览…", style="Ghost.TButton",
+                   command=lambda: self._browse_dir(self.video_var)).grid(
+            row=1, column=2, sticky=tk.W)
+
+        ttk.Button(cfg_card, text="保存目录", style="Accent.TButton",
+                   command=self._save_config).pack(anchor=tk.E, pady=(10, 0))
 
         # 同步状态卡片
         stat_card = ttk.LabelFrame(content, text="同步状态", style="Card.TLabelframe", padding=14)
@@ -296,18 +312,40 @@ class PhotoSyncApp:
         self.log.pack(fill=tk.BOTH, expand=True)
 
     def _load_config(self) -> None:
-        """加载配置。"""
+        """加载配置（填充目录输入框）。"""
         try:
             with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
                 config = json.load(fh)
-            self.lbl_photo.configure(text=config.get("pc_photo_dir",
-                config.get("pc_target_dir", "—")))
-            self.lbl_video.configure(text=config.get("pc_video_dir", "—"))
             self.config = config
+            self.photo_var.set(config.get("pc_photo_dir",
+                config.get("pc_target_dir", "D:/个人/相片")))
+            self.video_var.set(config.get("pc_video_dir", "D:/个人/视频"))
         except Exception:
             self.config = {"pc_photo_dir": "D:/个人/相片", "pc_video_dir": "D:/个人/视频"}
-            self.lbl_photo.configure(text=self.config["pc_photo_dir"])
-            self.lbl_video.configure(text=self.config["pc_video_dir"])
+            self.photo_var.set(self.config["pc_photo_dir"])
+            self.video_var.set(self.config["pc_video_dir"])
+
+    def _browse_dir(self, var: tk.StringVar) -> None:
+        """弹目录选择框，并把选中路径写入 StringVar。"""
+        initial = var.get().strip() or os.path.expanduser("~")
+        path = filedialog.askdirectory(initialdir=initial, title="选择目录")
+        if path:
+            var.set(path)
+
+    def _save_config(self) -> None:
+        """把当前目录输入框内容写回 config.json（保留其他字段）。"""
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except Exception:
+            cfg = {}
+        cfg["pc_photo_dir"] = self.photo_var.get().strip()
+        cfg["pc_video_dir"] = self.video_var.get().strip()
+        with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+            json.dump(cfg, fh, ensure_ascii=False, indent=2)
+        self.config = cfg
+        self._append_log(f"目录配置已保存：照片={cfg['pc_photo_dir']} 视频={cfg['pc_video_dir']}")
+        messagebox.showinfo("保存成功", "目标目录已保存到 config.json")
 
     def _start_sync(self, mode: str) -> None:
         """启动同步（后台线程）。
@@ -328,8 +366,9 @@ class PhotoSyncApp:
             self.file_label, self.stats_label, self.status_label
         )
 
-        photo_dir = self.config.get("pc_photo_dir", self.config.get("pc_target_dir", "D:/个人/相片"))
-        video_dir = self.config.get("pc_video_dir", "D:/个人/视频")
+        photo_dir = self.photo_var.get().strip() or self.config.get("pc_photo_dir",
+            self.config.get("pc_target_dir", "D:/个人/相片"))
+        video_dir = self.video_var.get().strip() or self.config.get("pc_video_dir", "D:/个人/视频")
         self._worker = SyncWorker(photo_dir, video_dir, reporter, mode=mode)
         self._worker.start()
         self._poll_worker()
