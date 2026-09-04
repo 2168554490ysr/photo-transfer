@@ -13,15 +13,39 @@ import subprocess
 import shlex
 import os
 import time
+import threading
 from typing import Optional
 
 # 全局超时设置（秒）
 TIMEOUT = 30
 MAX_RETRIES = 1
 
+# 正在运行的 adb 子进程集合（供取消时终止）
+_active_popen: set = set()
+_active_lock = threading.Lock()
+# 取消标志：取消/关闭窗口时置位，使 _run 不再重试启动新 adb
+_cancelled = threading.Event()
+
 
 class AdbError(Exception):
     """ADB 操作异常。"""
+
+
+def kill_all_adb() -> None:
+    """终止所有正在运行的 adb 子进程，并置取消标志（取消同步/关闭窗口时调用）。"""
+    _cancelled.set()
+    with _active_lock:
+        procs = list(_active_popen)
+    for p in procs:
+        try:
+            p.kill()
+        except Exception:
+            pass
+
+
+def reset_cancel() -> None:
+    """清除取消标志（新同步会话开始时调用）。"""
+    _cancelled.clear()
 
 
 def _run(full_cmd: list[str], cmd_desc: str, timeout: int = TIMEOUT) -> str:
@@ -39,33 +63,49 @@ def _run(full_cmd: list[str], cmd_desc: str, timeout: int = TIMEOUT) -> str:
         AdbError: 命令执行失败（含重试后）
     """
     last_error = None
+    # 无窗口运行子进程（Windows 下 GUI/pythonw 无父控制台时，避免 adb 弹出黑框）
+    no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     for attempt in range(MAX_RETRIES + 1):
+        proc = None
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 full_cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=timeout,
+                creationflags=no_window,
             )
-            if result.returncode != 0:
+            with _active_lock:
+                _active_popen.add(proc)
+            try:
+                stdout, stderr = proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                if _cancelled.is_set():
+                    raise AdbError("操作已取消")
                 last_error = AdbError(
-                    f"ADB命令失败: {cmd_desc}\n{result.stderr.strip()}"
+                    f"ADB命令超时({timeout}s): {cmd_desc}"
                 )
                 if attempt < MAX_RETRIES:
                     continue
                 raise last_error
-            if result.stdout is None:
-                return ""
-            return result.stdout
-        except subprocess.TimeoutExpired:
-            last_error = AdbError(
-                f"ADB命令超时({timeout}s): {cmd_desc}"
-            )
-            if attempt < MAX_RETRIES:
-                continue
-            raise last_error
+            if proc.returncode != 0:
+                if _cancelled.is_set():
+                    raise AdbError("操作已取消")
+                last_error = AdbError(
+                    f"ADB命令失败: {cmd_desc}\n{(stderr or '').strip()}"
+                )
+                if attempt < MAX_RETRIES:
+                    continue
+                raise last_error
+            return (stdout or "")
+        finally:
+            if proc is not None:
+                with _active_lock:
+                    _active_popen.discard(proc)
 
     # 理论上不会到这里，但保留安全出口
     raise last_error  # type: ignore[misc]
