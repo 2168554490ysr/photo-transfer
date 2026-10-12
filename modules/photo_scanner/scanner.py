@@ -336,6 +336,14 @@ def hash_verify(device: str, conflict_files: list[dict],
     return download_list
 
 
+def _safe_date(mtime) -> str:
+    """把 mtime（秒）转为 YYYY-MM-DD；非法/超范围时间戳兜底为 1970-01-01。"""
+    try:
+        return datetime.fromtimestamp(int(mtime)).strftime("%Y-%m-%d")
+    except (OSError, ValueError, OverflowError, TypeError):
+        return "1970-01-01"
+
+
 # @req REQ-05: 待下载清单输出
 def build_download_list(new_files: list[dict], hash_confirmed: list[dict]) -> list[dict]:
     """构建最终下载清单，添加 local_subdir 和 local_filename。
@@ -349,8 +357,7 @@ def build_download_list(new_files: list[dict], hash_confirmed: list[dict]) -> li
     """
     result = []
     for f in new_files + hash_confirmed:
-        dt = datetime.fromtimestamp(f["mtime"])
-        subdir = dt.strftime("%Y-%m-%d")
+        subdir = _safe_date(f.get("mtime"))
         result.append({
             "name": f["name"],
             "size": f["size"],

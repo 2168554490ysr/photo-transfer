@@ -265,6 +265,19 @@ class TestBuildDownloadList:
         assert result[0]["local_filename"] == "IMG_001.jpg"
         assert len(result[0]["local_subdir"]) == 10  # YYYY-MM-DD
 
+    def test_invalid_mtime_does_not_crash(self):
+        """非法/超范围 mtime 兜底为 1970-01-01，不抛异常。"""
+        new_files = [
+            {"name": "neg.jpg", "size": 100, "mtime": -99999999999, "path": "/sdcard/neg.jpg"},
+            {"name": "huge.jpg", "size": 100, "mtime": 2 ** 60, "path": "/sdcard/huge.jpg"},
+            {"name": "ok.jpg", "size": 100, "mtime": 1750000000, "path": "/sdcard/ok.jpg"},
+        ]
+        result = build_download_list(new_files, [])
+        assert len(result) == 3
+        by_name = {r["name"]: r["local_subdir"] for r in result}
+        assert by_name["neg.jpg"] == "1970-01-01"
+        assert by_name["huge.jpg"] == "1970-01-01"
+
     def test_sorted_by_date_then_name(self):
         """结果按日期+文件名排序。"""
         new_files = [
